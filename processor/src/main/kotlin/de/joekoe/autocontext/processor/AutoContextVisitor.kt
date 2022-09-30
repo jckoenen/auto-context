@@ -7,7 +7,7 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSVisitorVoid
 import de.joekoe.autocontext.AutoContext
-import de.joekoe.autocontext.processor.codegen.BuilderFunction
+import de.joekoe.autocontext.processor.codegen.ParallelSuspendThrowFirst
 import de.joekoe.autocontext.processor.codegen.generate
 
 class AutoContextVisitor(
@@ -25,7 +25,7 @@ class AutoContextVisitor(
                 annotated
             )
         } else {
-            generate(codeGenerator, classDecl, BuilderFunction.ALL)
+            generate(codeGenerator, classDecl, setOf(ParallelSuspendThrowFirst))
         }
     }
 }

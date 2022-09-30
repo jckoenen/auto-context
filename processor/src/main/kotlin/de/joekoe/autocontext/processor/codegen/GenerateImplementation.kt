@@ -1,8 +1,10 @@
 package de.joekoe.autocontext.processor.codegen
 
+import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSTypeReference
 import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
@@ -91,13 +93,19 @@ private fun KSClassDeclaration.generateImplementation(
     generatedAnnotation: AnnotationSpec,
     ctxName: ClassName
 ): TypeSpec {
-    val props = superTypes
-        .map { type ->
-            type.propertyBuilder()
-                .addModifiers(KModifier.OVERRIDE)
-                .build()
-        }
-        .asIterable()
+    val asOverriddenProperty = { type: KSTypeReference ->
+        type.propertyBuilder()
+            .addModifiers(KModifier.OVERRIDE)
+            .build()
+    }
+    val artificialSuperTypeProps = superTypes.map(asOverriddenProperty)
+        .toSet()
+
+    val declaredProps = getDeclaredProperties()
+        .map(KSPropertyDeclaration::type)
+        .map(asOverriddenProperty)
+
+    val allProps = (artificialSuperTypeProps + declaredProps).toSet()
 
     return TypeSpec.classBuilder(suffixedPeer("AutoImpl"))
         .addModifiers(KModifier.DATA)
@@ -105,15 +113,15 @@ private fun KSClassDeclaration.generateImplementation(
         .addSuperinterface(ctxName)
         .primaryConstructor(
             FunSpec.constructorBuilder()
-                .addParameters(props.map { ParameterSpec.builder(it.name, it.type).build() })
+                .addParameters(allProps.map { ParameterSpec.builder(it.name, it.type).build() })
                 .build()
         )
         .addProperties(
-            props.map { it.name to it.toBuilder() }
+            allProps.map { it.name to it.toBuilder() }
                 .map { (name, prop) -> prop.initializer(name) }
                 .map { it.build() }
         )
-        .apply { props.forEach { addSuperinterface(it.type, it.name) } }
+        .apply { artificialSuperTypeProps.forEach { addSuperinterface(it.type, it.name) } }
         .addAnnotation(generatedAnnotation)
         .build()
 }
