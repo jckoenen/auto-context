@@ -1,9 +1,11 @@
 package de.joekoe.autocontext.processor.codegen
 
+import com.google.devtools.ksp.getDeclaredFunctions
 import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSTypeReference
 import com.squareup.kotlinpoet.AnnotationSpec
@@ -28,6 +30,8 @@ fun generate(
     declaration: KSClassDeclaration,
     builderFunctions: Set<BuilderFunction>
 ) = with(declaration) {
+    requireNoAbstractFunctions()
+
     val generatedAnnotation = AnnotationSpec.builder(Generated::class)
         .addMember("value = [%S]", AutoContextProcessor::class.qualifiedName!!)
         .addMember("date = %S", Instant.now().toString())
@@ -54,6 +58,16 @@ fun generate(
         }
         .build()
         .writeTo(codeGenerator, Dependencies(true, declaration.containingFile!!))
+}
+
+private fun KSClassDeclaration.requireNoAbstractFunctions() {
+    val abstractFunctions = getDeclaredFunctions()
+        .filter(KSFunctionDeclaration::isAbstract)
+        .toList()
+
+    check(abstractFunctions.isEmpty()) {
+        "Cannot implement abstract functions in generated code. $abstractFunctions"
+    }
 }
 
 inline fun PropertySpec.toLambdaBuilder(
